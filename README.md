@@ -44,7 +44,7 @@
     <div class="flex-1 relative flex flex-col md:flex-row overflow-hidden">
         
         <!-- 左側：コントロールパネル -->
-        <aside class="w-full md:w-72 lg:w-80 bg-slate-800 border-r border-slate-700 p-3 flex flex-col gap-3 overflow-y-auto z-10 shadow-xl">
+        <aside class="w-full md:w-72 lg:w-80 bg-slate-800 border-r border-slate-700 p-3 flex flex-col gap-3 overflow-y-auto z-10 shadow-xl shrink-0">
             
             <!-- マイク入力制御 -->
             <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
@@ -195,7 +195,7 @@
             <span class="text-5xl block text-center mb-2">⚠️</span>
             <h3 class="text-xl font-bold text-center text-red-400 mb-4">埋め込み環境のセキュリティ制限</h3>
             <p class="text-xs text-gray-300 leading-relaxed text-left bg-slate-900 p-3 rounded-lg border border-slate-700 mb-5">
-                現在表示されているiframe環境ではブラウザの仕様によりマイクが起動できません。<br>以下のURLをコピーしてSafariやChromeのアドレスバーに直接貼り付けて開いてください。
+                現在表示されているiframe環境ではブラウザの仕様によりマイクが起動できません。<br>以下のURLをコピーしてSafariやChromeのアドレスバーに直接貼り付けて開してください。
             </p>
             <div class="mb-5 text-left border-b border-slate-700 pb-4">
                 <div class="flex gap-2">
@@ -280,6 +280,10 @@
             ボタン_エラー閉じる: document.getElementById('ボタン_エラー閉じる'),
         };
 
+        // --- 画面論理サイズ (高DPIリサイズ対応で自動算出・動的更新されます) ---
+        let 画面幅 = 800;
+        let 画面高さ = 600;
+
         // --- Web Audio API 関連 ---
         let オーディオコンテキスト = null;
         let アナライザー = null;
@@ -339,14 +343,35 @@
         ];
 
         // ==========================================
-        // 2. 初期化とイベント設定
+        // 2. 初期化とイベント設定 (DPI・画面回転追従対応)
         // ==========================================
 
         function キャンバスのリサイズ() {
-            キャンバス.width = コンテナ.clientWidth;
-            キャンバス.height = コンテナ.clientHeight;
+            // 論理ピクセルでのサイズ（CSS上の大きさ）を算出
+            画面幅 = コンテナ.clientWidth;
+            画面高さ = コンテナ.clientHeight;
+
+            // 高DPI(Retinaディスプレイ等)用のピクセル比率を取得して補正
+            const ピクセル比 = window.devicePixelRatio || 1;
+
+            // キャンバス自身の内部解像度をデバイスピクセル比に合わせて拡大
+            キャンバス.width = 画面幅 * ピクセル比;
+            キャンバス.height = 画面高さ * ピクセル比;
+
+            // 表示する物理サイズは元の論理幅に指定してフィットさせる
+            キャンバス.style.width = 画面幅 + "px";
+            キャンバス.style.height = 画面高さ + "px";
+
+            // コンテキストの描画基準比率を設定（以降、すべての描画を論理サイズベースで計算可能）
+            コンテキスト.setTransform(1, 0, 0, 1, 0, 0);
+            コンテキスト.scale(ピクセル比, ピクセル比);
         }
+
         window.addEventListener('resize', キャンバスのリサイズ);
+        // iOS・iPadの回転処理をさらに滑らかにキャッチするための向き変更リスナー
+        window.addEventListener('orientationchange', () => {
+            setTimeout(キャンバスのリサイズ, 100);
+        });
         キャンバスのリサイズ();
 
         function モードを切り替える(新モード) {
@@ -395,7 +420,6 @@
         UI.ボタン_一時停止.addEventListener('click', () => {
             状態.一時停止中 = !状態.一時停止中;
             if (状態.一時停止中) {
-                // 一時停止した瞬間の書き込みヘッド位置を記憶
                 状態.一時停止時の書き込み位置 = バッファ書き込み位置;
                 状態.履歴スクロールオフセット = 0;
                 UI.ボタン_一時停止.innerText = "▶ 再開する";
@@ -436,26 +460,20 @@
             const デルタY = clientY - 状態.直前のマウス位置.y;
 
             if (状態.ドラッグモード === 'move') {
-                // Y軸は常に画面上下移動
                 状態.カメラ.y += デルタY;
                 
                 if (状態.一時停止中 && 状態.モード === 'シミュレーション') {
-                    // ★ タイムトラベル機能：右ドラッグで過去へ遡る
+                    // ★ タイムトラベル：左右ドラッグで時間履歴を遡る
                     const 時間幅スケール = parseFloat(UI.スライダー_時間幅.value);
-                    const 基準表示サンプル数 = サンプリングレート * 0.15; // 画面幅=0.15秒
+                    const 基準表示サンプル数 = サンプリングレート * 0.15; 
                     const 表示サンプル数 = 基準表示サンプル数 / 時間幅スケール;
                     
-                    // 1px動かしたときのサンプル数（少し感度を上げるため2.0をかける）
-                    const pxあたりのサンプル数 = (表示サンプル数 / キャンバス.width) * 2.0;
-                    
-                    // 右にドラッグ(デルタXが正)で過去(オフセット増)へ
+                    const pxあたりのサンプル数 = (表示サンプル数 / 画面幅) * 2.0;
                     状態.履歴スクロールオフセット += デルタX * pxあたりのサンプル数;
                     
-                    // 制限：0 ～ (過去3秒 - 表示分)
                     const 最大オフセット = (過去記録秒数 * サンプリングレート) - 表示サンプル数 - 100;
                     状態.履歴スクロールオフセット = Math.max(0, Math.min(最大オフセット, 状態.履歴スクロールオフセット));
                 } else {
-                    // リアルタイム時は通常のX軸画面移動
                     状態.カメラ.x += デルタX;
                 }
             } else {
@@ -476,12 +494,42 @@
 
         function ドラッグ終了() { 状態.ドラッグ中 = false; }
 
-        キャンバス.addEventListener('mousedown', (e) => ドラッグ開始(e.clientX, e.clientY));
-        window.addEventListener('mousemove', (e) => ドラッグ中移動(e.clientX, e.clientY));
+        // キャンバスコンテナ内でのドラッグ位置を、論理座標（CSSピクセル）で正しく計算してハンドリングする
+        function マウスタッチイベント取得(e, 関数) {
+            let x, y;
+            if (e.touches && e.touches.length > 0) {
+                // 埋め込み環境でも正しく動くようにgetBoundingClientRectを考慮
+                constrect = キャンバス.getBoundingClientRect();
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                const rect = キャンバス.getBoundingClientRect();
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+            関数(x, y);
+        }
+
+        キャンバス.addEventListener('mousedown', (e) => マウスタッチイベント取得(e, ドラッグ開始));
+        window.addEventListener('mousemove', (e) => {
+            if (状態.ドラッグ中) {
+                const rect = キャンバス.getBoundingClientRect();
+                ドラッグ中移動(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        });
         window.addEventListener('mouseup', ドラッグ終了);
-        キャンバス.addEventListener('touchstart', (e) => { if (e.touches.length === 1) ドラッグ開始(e.touches[0].clientX, e.touches[0].clientY); });
-        window.addEventListener('touchmove', (e) => { if (e.touches.length === 1) ドラッグ中移動(e.touches[0].clientX, e.touches[0].clientY); });
+        
+        キャンバス.addEventListener('touchstart', (e) => { 
+            if (e.touches.length === 1) マウスタッチイベント取得(e, ドラッグ開始); 
+        });
+        window.addEventListener('touchmove', (e) => { 
+            if (状態.ドラッグ中 && e.touches.length === 1) {
+                const rect = キャンバス.getBoundingClientRect();
+                ドラッグ中移動(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top);
+            }
+        });
         window.addEventListener('touchend', ドラッグ終了);
+
         キャンバス.addEventListener('wheel', (e) => {
             e.preventDefault();
             const ズーム量 = e.deltaY * -0.001;
@@ -492,9 +540,21 @@
         // 4. Web Audio API ＆ リングバッファ（ドライブレコーダー）
         // ==========================================
 
+        let オーディオ初期化完了 = false;
+
         async function オーディオ初期化() {
-            if (!アナライザー && オーディオコンテキスト) {
-                // iOS対策のため、イベントリスナー内で既に生成されている前提
+            if (オーディオ初期化完了) return; 
+
+            if (!オーディオコンテキスト) {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                オーディオコンテキスト = new AudioContext();
+            }
+            
+            if (オーディオコンテキスト.state === 'suspended') {
+                 await オーディオコンテキスト.resume();
+            }
+
+            if (!アナライザー) {
                 サンプリングレート = オーディオコンテキスト.sampleRate;
                 
                 アナライザー = オーディオコンテキスト.createAnalyser();
@@ -502,15 +562,13 @@
                 時間領域データ = new Uint8Array(アナライザー.frequencyBinCount);
                 周波数データ = new Uint8Array(アナライザー.frequencyBinCount);
 
-                // --- 過去3秒間のリングバッファ生成 ---
                 const バッファ長 = サンプリングレート * 過去記録秒数;
                 波形履歴バッファ = new Float32Array(バッファ長);
                 バッファ書き込み位置 = 0;
 
-                // ScriptProcessorを使って生波形データを常時記録
                 プロセッサノード = オーディオコンテキスト.createScriptProcessor(2048, 1, 1);
                 プロセッサノード.onaudioprocess = (e) => {
-                    if (状態.一時停止中) return; // 停止中は録音ストップ
+                    if (状態.一時停止中) return; 
                     const 入力 = e.inputBuffer.getChannelData(0);
                     for (let i = 0; i < 入力.length; i++) {
                         波形履歴バッファ[バッファ書き込み位置] = 入力[i];
@@ -518,12 +576,12 @@
                     }
                 };
 
-                // プロセッサを繋がないと動作しないため、音量0にして出力に繋ぐ
                 ミュートノード = オーディオコンテキスト.createGain();
                 ミュートノード.gain.value = 0;
                 プロセッサノード.connect(ミュートノード);
                 ミュートノード.connect(オーディオコンテキスト.destination);
             }
+            オーディオ初期化完了 = true;
         }
 
         function アプリURLの初期設定() {
@@ -536,41 +594,40 @@
         }
         window.addEventListener('load', アプリURLの初期設定);
 
-        // ★ GitHub・iOSのクリック即時許可に対応する超重要ロジック
         UI.ボタン_マイク.addEventListener('click', async () => {
             try {
-                // 【超重要】ボタンが押された「同期タイミング」でAudioContextを作成＆resumeする。
-                // これにより、iOSのSafariやGitHub Pages環境でのマイク権限ブロックを回避します。
                 window.AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!オーディオコンテキスト) {
                     オーディオコンテキスト = new AudioContext();
                 }
                 if (オーディオコンテキスト.state === 'suspended') {
-                    オーディオコンテキスト.resume();
+                    await オーディオコンテキスト.resume(); 
                 }
 
-                // その後でマイクへのアクセス要求を行う
                 マイクストリーム = await navigator.mediaDevices.getUserMedia({ 
                     audio: { echoCancellation: true, noiseSuppression: true } 
                 });
 
-                // バッファ等の準備
                 await オーディオ初期化();
                 
-                const マイクソース = オーディオコンテキスト.createMediaStreamSource(マイクストリーム);
-                マイクソース.connect(アナライザー); // データ解析用
-                マイクソース.connect(プロセッサノード); // 履歴録音用
-                
-                状態.マイク接続済み = true;
-                UI.ボタン_マイク.classList.replace('bg-red-600', 'bg-slate-700');
-                UI.ボタン_マイク.classList.replace('hover:bg-red-500', 'hover:bg-slate-600');
-                UI.ボタン_マイク.innerHTML = '🎤 マイク接続中';
-                UI.ステータス_マイク.innerText = "接続済み";
-                UI.ステータス_マイク.className = "text-green-400";
+                if (プロセッサノード && アナライザー) {
+                    const マイクソース = オーディオコンテキスト.createMediaStreamSource(マイクストリーム);
+                    マイクソース.connect(アナライザー); 
+                    マイクソース.connect(プロセッサノード); 
+                    
+                    状態.マイク接続済み = true;
+                    UI.ボタン_マイク.classList.replace('bg-red-600', 'bg-slate-700');
+                    UI.ボタン_マイク.classList.replace('hover:bg-red-500', 'hover:bg-slate-600');
+                    UI.ボタン_マイク.innerHTML = '🎤 マイク接続中';
+                    UI.ステータス_マイク.innerText = "接続済み";
+                    UI.ステータス_マイク.className = "text-green-400";
+                } else {
+                    throw new Error("オーディオノードの初期化に失敗しました。");
+                }
             } catch (エラー) {
                 console.warn("マイク取得例外を検知:", エラー);
                 UI.入力_アプリURL.value = window.location.href;
-                UI.モーダル_マイクエラー.classList.remove('hidden'); // 埋め込み環境等で拒否された場合の案内
+                UI.モーダル_マイクエラー.classList.remove('hidden'); 
             }
         });
 
@@ -595,11 +652,16 @@
             状態.テスト音要求中 = true;
             window.AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!オーディオコンテキスト) オーディオコンテキスト = new AudioContext();
-            if (オーディオコンテキスト.state === 'suspended') オーディオコンテキスト.resume();
+            
+            const 初期化プロセス = async () => {
+                if (オーディオコンテキスト.state === 'suspended') await オーディオコンテキスト.resume();
+                await オーディオ初期化();
 
-            オーディオ初期化().then(() => {
                 if (!状態.テスト音要求中) return;
-                if (テスト用オシレータ) return;
+                if (テスト用オシレータ) return; 
+                
+                if (!プロセッサノード || !アナライザー) return;
+
                 テスト用オシレータ = オーディオコンテキスト.createOscillator();
                 テスト用オシレータ.type = 'sine';
                 テスト用オシレータ.frequency.value = 329.63; 
@@ -607,14 +669,17 @@
                 キャンバス.addEventListener('mousemove', オシレータ音程変更);
                 
                 テスト用オシレータ.connect(アナライザー);
-                テスト用オシレータ.connect(プロセッサノード); // 履歴録音用にも繋ぐ
+                テスト用オシレータ.connect(プロセッサノード); 
                 アナライザー.connect(オーディオコンテキスト.destination); 
+                
                 try { テスト用オシレータ.start(); } catch(e) {}
                 
                 状態.マイク接続済み = true;
                 UI.ステータス_マイク.innerText = "テスト発振中";
                 UI.ステータス_マイク.className = "text-emerald-400";
-            });
+            };
+            
+            初期化プロセス();
         }
 
         function テスト音停止() {
@@ -632,7 +697,8 @@
 
         function オシレータ音程変更(e) {
             if(テスト用オシレータ) {
-                const 割合 = 1.0 - (e.clientY / キャンバス.height);
+                // 論理座標のキャンバスの高さを使用
+                const 割合 = 1.0 - (e.clientY / 画面高さ);
                 const 新周波数 = 100 + (割合 * 800);
                 テスト用オシレータ.frequency.setTargetAtTime(新周波数, オーディオコンテキスト.currentTime, 0.05);
             }
@@ -649,7 +715,7 @@
         // ==========================================
 
         function データを解析する() {
-            if (!アナライザー || 状態.一時停止中) return; // 一時停止中は解析・HUD更新もストップ
+            if (!アナライザー || 状態.一時停止中) return; 
 
             アナライザー.getByteTimeDomainData(時間領域データ);
             アナライザー.getByteFrequencyData(周波数データ);
@@ -711,7 +777,6 @@
         // 6. 描画処理：タイムトラベル・シミュレーション
         // ==========================================
 
-        // リングバッファからゼロクロス（波が負から正になる点）を探す
         function 履歴からゼロクロスを探す(開始インデックス, 探索範囲) {
             const バッファ長 = 波形履歴バッファ.length;
             for (let i = 0; i < 探索範囲; i++) {
@@ -719,7 +784,6 @@
                 const idx2 = (開始インデックス + i + 1 + バッファ長) % バッファ長;
                 const v1 = 波形履歴バッファ[idx1];
                 const v2 = 波形履歴バッファ[idx2];
-                // ノイズを考慮して微小な傾きを要求
                 if (v1 <= 0 && v2 > 0 && (v2 - v1) > 0.01) {
                     return i; 
                 }
@@ -728,21 +792,22 @@
         }
 
         function シミュレーションを描画する() {
+            // 背景クリア
             コンテキスト.fillStyle = 'rgba(15, 23, 42, 1.0)';
-            コンテキスト.fillRect(0, 0, キャンバス.width, キャンバス.height);
+            コンテキスト.fillRect(0, 0, 画面幅, 画面高さ);
 
             if (!状態.マイク接続済み || !波形履歴バッファ || 波形履歴バッファ.length === 0) {
                 コンテキスト.fillStyle = '#64748b';
                 コンテキスト.font = 'bold 16px sans-serif';
                 コンテキスト.textAlign = 'center';
-                コンテキスト.fillText('マイクを接続するか、テスト音を鳴らしてください', キャンバス.width / 2, キャンバス.height / 2 - 20);
+                コンテキスト.fillText('マイクを接続するか、テスト音を鳴らしてください', 画面幅 / 2, 画面高さ / 2 - 20);
                 
                 コンテキスト.fillStyle = '#38bdf8';
                 コンテキスト.font = '12px sans-serif';
-                コンテキスト.fillText('ドラッグでX軸/Y軸スケールのリアルタイム変更が可能です！', キャンバス.width / 2, キャンバス.height / 2 + 10);
+                コンテキスト.fillText('ドラッグでX軸/Y軸スケールのリアルタイム変更が可能です！', 画面幅 / 2, 画面高さ / 2 + 10);
                 
-                コンテキスト.fillStyle = '#facc15'; // yellow-400
-                コンテキスト.fillText('⚠️ iPadでマイクが反応しない場合：「設定」アプリ ＞「Safari」＞「マイク」を「許可」にしてください', キャンバス.width / 2, キャンバス.height / 2 + 40);
+                コンテキスト.fillStyle = '#facc15'; 
+                コンテキスト.fillText('⚠️ iPadでマイクが反応しない場合：「設定」アプリ ＞「Safari」＞「マイク」を「許可」にしてください', 画面幅 / 2, 画面高さ / 2 + 40);
                 return;
             }
 
@@ -750,22 +815,23 @@
             const 時間幅スケール = parseFloat(UI.スライダー_時間幅.value);
 
             コンテキスト.save();
-            コンテキスト.translate(キャンバス.width / 2 + 状態.カメラ.x, キャンバス.height / 2 + 状態.カメラ.y);
+            // 常時画面幅の中央・高さ中央を基準に変形する
+            コンテキスト.translate(画面幅 / 2 + 状態.カメラ.x, 画面高さ / 2 + 状態.カメラ.y);
             コンテキスト.scale(状態.カメラ.スケール, 状態.カメラ.スケール);
 
-            // グリッド
+            // グリッド描画
             コンテキスト.strokeStyle = 'rgba(56, 189, 248, 0.1)';
             コンテキスト.lineWidth = 1 / 状態.カメラ.スケール;
             コンテキスト.beginPath();
             const グリッド幅 = 60;
-            const 表示境界 = 2000;
+            const 表示境界 = 3000; // iPad横画面でも十分カバーできるように拡大
             for (let i = -表示境界; i <= 表示境界; i += グリッド幅) {
                 コンテキスト.moveTo(i, -表示境界); コンテキスト.lineTo(i, 表示境界);
                 コンテキスト.moveTo(-表示境界, i); コンテキスト.lineTo(表示境界, i);
             }
             コンテキスト.stroke();
 
-            // 中心軸と音圧限界線
+            // 中心軸
             コンテキスト.strokeStyle = 'rgba(56, 189, 248, 0.35)';
             コンテキスト.lineWidth = 2 / 状態.カメラ.スケール;
             コンテキスト.beginPath();
@@ -773,6 +839,7 @@
             コンテキスト.moveTo(0, -表示境界); コンテキスト.lineTo(0, 表示境界);
             コンテキスト.stroke();
 
+            // 振幅の限界表示線（Y軸スケールに合わせて伸縮）
             コンテキスト.strokeStyle = 'rgba(239, 68, 68, 0.2)'; 
             コンテキスト.setLineDash([10, 10]);
             コンテキスト.beginPath();
@@ -782,25 +849,20 @@
             コンテキスト.stroke();
             コンテキスト.setLineDash([]); 
 
-            // ★ 波形履歴の描画計算
-            // 基準表示幅をこれまでの3倍（0.15秒分のサンプル）に設定
+            // ★ 波形履歴の描画計算 (画面幅 画面幅 に100%追従して波が自動フィットします)
             const 基準表示サンプル数 = サンプリングレート * 0.15;
             const 表示サンプル数 = Math.floor(基準表示サンプル数 / 時間幅スケール);
             const バッファ長 = 波形履歴バッファ.length;
 
             let 読み取り基準位置 = 0;
             if (状態.一時停止中) {
-                // スクロールオフセット（過去へ遡る量）を適用
                 読み取り基準位置 = Math.floor(状態.一時停止時の書き込み位置 - 表示サンプル数 - 状態.履歴スクロールオフセット);
             } else {
-                // リアルタイム時は常に最新から表示分遡った位置
                 読み取り基準位置 = Math.floor(バッファ書き込み位置 - 表示サンプル数);
             }
 
-            // 負のインデックスの正規化
             読み取り基準位置 = ((読み取り基準位置 % バッファ長) + バッファ長) % バッファ長;
 
-            // ゼロクロス補正（リアルタイム時のみ波を止めて見せる）
             let ゼロクロス補正 = 0;
             if (!状態.一時停止中) {
                 ゼロクロス補正 = 履歴からゼロクロスを探す(読み取り基準位置, Math.floor(表示サンプル数 / 4));
@@ -808,7 +870,9 @@
 
             const 実際の開始位置 = (読み取り基準位置 + ゼロクロス補正) % バッファ長;
             const 実際の描画サンプル数 = 表示サンプル数 - ゼロクロス補正;
-            const X増分 = キャンバス.width / 実際の描画サンプル数;
+            
+            // どのような画面の横幅でも画面端から端まで均等に波が広がるようにX刻みを調整
+            const X増分 = 画面幅 / 実際の描画サンプル数;
 
             コンテキスト.lineWidth = 3 / 状態.カメラ.スケール;
             コンテキスト.strokeStyle = '#38bdf8'; 
@@ -818,9 +882,9 @@
             コンテキスト.beginPath();
             for (let i = 0; i < 実際の描画サンプル数; i++) {
                 const idx = (実際の開始位置 + i) % バッファ長;
-                const 正規化振幅 = 波形履歴バッファ[idx]; // Float32 (-1.0 ~ 1.0)
+                const 正規化振幅 = 波形履歴バッファ[idx]; 
                 
-                const x = (i * X増分) - (キャンバス.width / 2);
+                const x = (i * X増分) - (画面幅 / 2);
                 const y = 正規化振幅 * -150 * 振幅スケール;
 
                 if (i === 0) コンテキスト.moveTo(x, y);
@@ -832,33 +896,32 @@
             // HUDとメーターの描画
             ダブルメーターを描画する();
 
-            // ★ タイムトラベル（過去遡り）インジケーターの描画
+            // タイムトラベル（過去遡り）インジケーター
             if (状態.一時停止中) {
                 const 遡り秒数 = 状態.履歴スクロールオフセット / サンプリングレート;
-                コンテキスト.fillStyle = 'rgba(250, 204, 21, 0.9)'; // yellow-400
-                コンテキスト.font = 'bold 18px monospace';
+                コンテキスト.fillStyle = 'rgba(250, 204, 21, 0.9)'; 
+                コンテキスト.font = 'bold 16px monospace';
                 コンテキスト.textAlign = 'center';
-                
-                // 画面下部に表示
                 コンテキスト.shadowBlur = 10;
                 コンテキスト.shadowColor = '#000';
                 
                 if (遡り秒数 > 0.01) {
-                    コンテキスト.fillText(`◀◀ 過去 ${遡り秒数.toFixed(2)} 秒の波形を観察中`, キャンバス.width / 2, キャンバス.height - 30);
+                    コンテキスト.fillText(`◀◀ 過去 ${遡り秒数.toFixed(2)} 秒の波形を観察中`, 画面幅 / 2, 画面高さ - 30);
                 } else {
-                    コンテキスト.fillText(`⏸ 一時停止中 (左右ドラッグで最大3秒前へタイムトラベル)`, キャンバス.width / 2, キャンバス.height - 30);
+                    コンテキスト.fillText(`⏸ 一時停止中 (左右ドラッグで最大3秒前へタイムトラベル)`, 画面幅 / 2, 画面高さ - 30);
                 }
                 コンテキスト.shadowBlur = 0;
             }
         }
 
-        // --- アナログダブルメーター描画 ---
+        // --- アナログダブルメーター描画 (画面の幅と位置に自動フィット) ---
         function ダブルメーターを描画する() {
             const メーター幅 = 130;
             const メーター高さ = 75;
             const Y開始 = 15;
             
-            const メーター2_X = キャンバス.width - メーター幅 - 15; 
+            // 常に右上にきれいに整列するように画面幅(論理ピクセル)を基準に配置
+            const メーター2_X = 画面幅 - メーター幅 - 15; 
             const メーター1_X = メーター2_X - メーター幅 - 15;      
 
             メーター基礎を描画("PITCH (Hz)", メーター1_X, Y開始, メーター幅, メーター高さ);
@@ -940,16 +1003,18 @@
 
         class 音波ターゲット {
             constructor(メロディ定義, インデックス, 難易度) {
-                this.x = キャンバス.width + 100;
+                this.x = 画面幅 + 100; // 常に最新の画面幅の外側から登場
                 this.幅 = 75;
                 this.音名 = メロディ定義.音名;
                 this.目標周波数 = メロディ定義.周波数;
                 this.通過済み = false;
                 this.休符 = メロディ定義.周波数 === 0;
 
-                if (難易度 == 1) { this.許容範囲 = 100; this.速度 = 2.5 * (キャンバス.width / 1000); } 
-                else if (難易度 == 2) { this.許容範囲 = 60; this.速度 = 4.0 * (キャンバス.width / 1000); } 
-                else { this.許容範囲 = 30; this.速度 = 6.5 * (キャンバス.width / 1000); }
+                // 画面解像度(画面幅)の違いによるゲーム進行速度の不公平感をなくす補正
+                const 速度比率 = 画面幅 / 1000;
+                if (難易度 == 1) { this.許容範囲 = 100; this.速度 = 2.5 * 速度比率; } 
+                else if (難易度 == 2) { this.許容範囲 = 60; this.速度 = 4.0 * 速度比率; } 
+                else { this.許容範囲 = 30; this.速度 = 6.5 * 速度比率; }
             }
             更新() { this.x -= this.速度; }
             描画(ctx) {
@@ -998,7 +1063,8 @@
         function 周波数をY座標に変換(hz) {
             const 最小Hz = 100; const 最大Hz = 1000;
             const クランプ = Math.max(最小Hz, Math.min(最大Hz, hz));
-            return キャンバス.height - (((クランプ - 最小Hz) / (最大Hz - 最小Hz)) * (キャンバス.height - 130) + 65);
+            // 常に変動する論理画面高さを元にマッピング
+            return 画面高さ - (((クランプ - 最小Hz) / (最大Hz - 最小Hz)) * (画面高さ - 130) + 65);
         }
 
         function ゲームを開始する() {
@@ -1028,12 +1094,14 @@
             }
 
             const 最終ターゲット = 状態.ゲーム.ターゲット一覧[状態.ゲーム.ターゲット一覧.length - 1];
-            if (!最終ターゲット || 最終ターゲット.x < キャンバス.width - 240) {
+            // 画面の幅に連動して新しいターゲットの発生間隔(距離)を最適化
+            if (!最終ターゲット || 最終ターゲット.x < 画面幅 - 240) {
                 if (状態.ゲーム.現在のメロディインデックス < かえるの合唱音階.length) メロディターゲットを投下する();
                 else if (状態.ゲーム.ターゲット一覧.length === 0) ゲーム終了();
             }
 
-            const プレイヤーX = キャンバス.width * 0.22;
+            // 自機のX位置を論理画面幅の22%の位置に設定
+            const プレイヤーX = 画面幅 * 0.22;
             const プレイヤーY = 周波数をY座標に変換(状態.滑らかなピッチHz);
 
             for (let i = 状態.ゲーム.ターゲット一覧.length - 1; i >= 0; i--) {
@@ -1076,43 +1144,62 @@
         }
 
         function ゲームを描画する() {
-            コンテキスト.fillStyle = '#0b0f19'; コンテキスト.fillRect(0, 0, キャンバス.width, キャンバス.height);
-            コンテキスト.strokeStyle = 'rgba(255, 255, 255, 0.05)'; コンテキスト.fillStyle = 'rgba(148, 163, 184, 0.35)'; コンテキスト.font = 'bold 12px monospace';
+            コンテキスト.fillStyle = '#0b0f19'; 
+            コンテキスト.fillRect(0, 0, 画面幅, 画面高さ);
+            
+            コンテキスト.strokeStyle = 'rgba(255, 255, 255, 0.05)'; 
+            コンテキスト.fillStyle = 'rgba(148, 163, 184, 0.35)'; 
+            コンテキスト.font = 'bold 12px monospace';
             
             [{名前: "ド(C4)", f: 261.63}, {名前: "レ(D4)", f: 293.66}, {名前: "ミ(E4)", f: 329.63}, {名前: "ファ(F4)", f: 349.23}, {名前: "ソ(G4)", f: 392.00}, {名前: "ラ(A4)", f: 440.00}].forEach(音 => {
                 const y = 周波数をY座標に変換(音.f);
-                コンテキスト.beginPath(); コンテキスト.moveTo(0, y); コンテキスト.lineTo(キャンバス.width, y); コンテキスト.stroke();
+                コンテキスト.beginPath(); コンテキスト.moveTo(0, y); コンテキスト.lineTo(画面幅, y); コンテキスト.stroke();
                 コンテキスト.textAlign = 'left'; コンテキスト.fillText(音.名前, 15, y - 4);
             });
 
             状態.ゲーム.ターゲット一覧.forEach(ターゲット => ターゲット.描画(コンテキスト));
 
-            const プレイヤーX = キャンバス.width * 0.22; const プレイヤーY = 周波数をY座標に変換(状態.滑らかなピッチHz);
+            const プレイヤーX = 画面幅 * 0.22; 
+            const プレイヤーY = 周波数をY座標に変換(状態.滑らかなピッチHz);
             const 歌唱中 = 状態.現在のピッチHz > 0 && 状態.滑らかなデシベル > -45;
 
             if (歌唱中) {
                 コンテキスト.save();
-                const グラデーション = コンテキスト.createLinearGradient(プレイヤーX, プレイヤーY, キャンバス.width, プレイヤーY);
+                const グラデーション = コンテキスト.createLinearGradient(プレイヤーX, プレイヤーY, 画面幅, プレイヤーY);
                 グラデーション.addColorStop(0, `rgba(56, 189, 248, ${Math.max(0.2, (状態.滑らかなデシベル + 60) / 60)})`); 
                 グラデーション.addColorStop(1, 'rgba(56, 189, 248, 0)');
-                コンテキスト.beginPath(); コンテキスト.moveTo(プレイヤーX, プレイヤーY); コンテキスト.lineTo(キャンバス.width, プレイヤーY);
-                コンテキスト.strokeStyle = グラデーション; コンテキスト.lineWidth = 14 * ((状態.滑らかなデシベル + 60) / 60);
-                コンテキスト.shadowBlur = 15; コンテキスト.shadowColor = '#38bdf8'; コンテキスト.stroke(); コンテキスト.restore();
+                コンテキスト.beginPath(); コンテキスト.moveTo(プレイヤーX, プレイヤーY); コンテキスト.lineTo(画面幅, プレイヤーY);
+                コンテキスト.strokeStyle = グラデーション; 
+                コンテキスト.lineWidth = 14 * ((状態.滑らかなデシベル + 60) / 60);
+                コンテキスト.shadowBlur = 15; 
+                コンテキスト.shadowColor = '#38bdf8'; 
+                コンテキスト.stroke(); 
+                コンテキスト.restore();
             }
 
-            コンテキスト.save(); コンテキスト.beginPath();
-            const 半径 = 歌唱中 ? 18 : 12; コンテキスト.arc(プレイヤーX, プレイヤーY, 半径, 0, Math.PI * 2);
+            コンテキスト.save(); 
+            コンテキスト.beginPath();
+            const 半径 = 歌唱中 ? 18 : 12; 
+            コンテキスト.arc(プレイヤーX, プレイヤーY, 半径, 0, Math.PI * 2);
             コンテキスト.fillStyle = 歌唱中 ? '#22c55e' : '#475569'; 
             if (歌唱中) { コンテキスト.shadowBlur = 15; コンテキスト.shadowColor = '#22c55e'; }
             コンテキスト.fill();
-            コンテキスト.beginPath(); コンテキスト.arc(プレイヤーX, プレイヤーY, 半径 * 0.5, 0, Math.PI * 2); コンテキスト.fillStyle = '#ffffff'; コンテキスト.fill(); コンテキスト.restore();
+            
+            コンテキスト.beginPath(); 
+            コンテキスト.arc(プレイヤーX, プレイヤーY, 半径 * 0.5, 0, Math.PI * 2); 
+            コンテキスト.fillStyle = '#ffffff'; 
+            コンテキスト.fill(); 
+            コンテキスト.restore();
 
             状態.ゲーム.パーティクル一覧.forEach(p => p.描画(コンテキスト));
 
             if (!状態.ゲーム.実行中 && !UI.オーバーレイ_ゲーム結果.classList.contains('hidden')) {
-                 コンテキスト.fillStyle = 'rgba(15, 23, 42, 0.75)'; コンテキスト.fillRect(0, 0, キャンバス.width, キャンバス.height);
-                 コンテキスト.fillStyle = '#ffffff'; コンテキスト.font = 'bold 20px sans-serif'; コンテキスト.textAlign = 'center';
-                 コンテキスト.fillText('「演奏を始める！」ボタンを押してスタート！', キャンバス.width / 2, キャンバス.height / 2);
+                 コンテキスト.fillStyle = 'rgba(15, 23, 42, 0.75)'; 
+                 コンテキスト.fillRect(0, 0, 画面幅, 画面高さ);
+                 コンテキスト.fillStyle = '#ffffff'; 
+                 コンテキスト.font = 'bold 20px sans-serif'; 
+                 コンテキスト.textAlign = 'center';
+                 コンテキスト.fillText('「演奏を始める！」ボタンを押してスタート！', 画面幅 / 2, 画面高さ / 2);
             }
             ダブルメーターを描画する();
         }
