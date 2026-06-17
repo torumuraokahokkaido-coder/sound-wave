@@ -21,10 +21,10 @@
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     </style>
 </head>
-<body class="flex flex-col h-screen overflow-hidden">
+<body class="flex flex-col h-[100dvh] overflow-hidden">
 
     <!-- ヘッダー＆タブナビゲーション -->
-    <header class="p-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center z-20 shadow-lg">
+    <header class="p-2 md:p-3 bg-slate-900 border-b border-slate-700 flex justify-between items-center z-20 shadow-lg shrink-0">
         <div class="flex items-center space-x-3">
             <span class="text-3xl">🐸</span>
             <div>
@@ -44,12 +44,12 @@
     <div class="flex-1 relative flex flex-col md:flex-row overflow-hidden">
         
         <!-- 左側：コントロールパネル -->
-        <aside class="w-full md:w-80 bg-slate-800 border-r border-slate-700 p-4 flex flex-col gap-4 overflow-y-auto z-10 shadow-xl">
+        <aside class="w-full md:w-72 lg:w-80 bg-slate-800 border-r border-slate-700 p-3 flex flex-col gap-3 overflow-y-auto z-10 shadow-xl">
             
             <!-- マイク入力制御 -->
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
-                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Audio Input (音の入力)</h2>
-                <button id="ボタン_マイク" class="w-full py-3 bg-red-600 hover:bg-red-500 rounded-lg text-white font-bold shadow-lg transition-all flex items-center justify-center gap-2 mb-3">
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
+                <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Audio Input (音の入力)</h2>
+                <button id="ボタン_マイク" class="w-full py-2.5 bg-red-600 hover:bg-red-500 rounded-lg text-white font-bold shadow-lg transition-all flex items-center justify-center gap-2 mb-2">
                     <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
                     マイクを接続する
                 </button>
@@ -57,10 +57,13 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
                     テスト音(押している間鳴る)
                 </button>
+                <p class="text-[10px] text-gray-400 mt-2 text-center leading-tight">
+                    ※iPadでマイクが使えない場合：<br><span class="text-yellow-400 font-bold">「設定」アプリ ＞「Safari」＞「マイク」を許可</span><br>に設定してページを再読み込みしてください。
+                </p>
             </div>
 
             <!-- ドラッグ操作切り替え -->
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
                 <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Drag Action (ドラッグ時の操作)</h2>
                 <div class="grid grid-cols-2 gap-2">
                     <button id="ボタン_ドラッグ移動" class="py-2 px-3 rounded-lg text-sm font-bold bg-blue-600 text-white border-2 border-blue-400 shadow-lg">
@@ -76,11 +79,11 @@
             </div>
 
             <!-- シミュレーション・コントロール -->
-            <div id="パネル_シミュ" class="flex flex-col gap-4">
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
-                    <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Oscilloscope Control</h2>
+            <div id="パネル_シミュ" class="flex flex-col gap-3">
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner">
+                    <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Oscilloscope Control</h2>
                     
-                    <div class="mb-3">
+                    <div class="mb-2">
                         <div class="flex justify-between text-sm mb-1">
                             <span class="text-gray-300">Y軸 (振幅スケール)</span>
                             <span id="表示_振幅" class="text-blue-400 font-mono">1.0x</span>
@@ -88,7 +91,7 @@
                         <input type="range" id="スライダー_振幅" min="0.1" max="5.0" step="0.1" value="1.0" class="w-full accent-blue-500">
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-2">
                         <div class="flex justify-between text-sm mb-1">
                             <span class="text-gray-300">X軸 (表示時間スケール)</span>
                             <span id="表示_時間幅" class="text-blue-400 font-mono">1.0x</span>
@@ -104,24 +107,24 @@
             </div>
 
             <!-- ゲーム・コントロール -->
-            <div id="パネル_ゲーム" class="flex flex-col gap-4 hidden">
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner text-center">
+            <div id="パネル_ゲーム" class="flex flex-col gap-3 hidden">
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 shadow-inner text-center">
                     <h2 class="text-xs font-bold text-yellow-500 uppercase tracking-wider mb-2 text-left flex items-center gap-1">
                         <span>🐸</span> <span>かえるの合唱ミッション</span>
                     </h2>
                     
                     <label class="block text-left text-xs text-gray-400 mb-1">難易度</label>
-                    <select id="セレクト_難易度" class="w-full p-2 bg-slate-800 text-white rounded-lg border border-slate-600 mb-3 text-sm focus:outline-none focus:border-blue-500">
+                    <select id="セレクト_難易度" class="w-full p-2 bg-slate-800 text-white rounded-lg border border-slate-600 mb-2 text-sm focus:outline-none focus:border-blue-500">
                         <option value="1">🟢 初級 (音程が合わせやすい)</option>
                         <option value="2">🟡 中級 (標準テンポ)</option>
                         <option value="3">🔴 上級 (ハイスピード！)</option>
                     </select>
 
-                    <button id="ボタン_ゲーム開始" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all transform active:scale-95 mb-3">
+                    <button id="ボタン_ゲーム開始" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all transform active:scale-95 mb-2">
                         🎵 演奏を始める！
                     </button>
 
-                    <div class="grid grid-cols-2 gap-2 mt-2 border-t border-slate-700 pt-3">
+                    <div class="grid grid-cols-2 gap-2 mt-1 border-t border-slate-700 pt-2">
                         <div>
                             <p class="text-[10px] text-gray-400 mb-1">SCORE</p>
                             <p id="表示_スコア" class="text-2xl font-black text-yellow-400">0</p>
@@ -135,7 +138,7 @@
             </div>
             
             <!-- デジタルリアルタイム表示 -->
-            <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-inner flex flex-col gap-2">
+            <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700 shadow-inner flex flex-col gap-2">
                 <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider border-b border-slate-700 pb-1">📊 音響解析データ</h3>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <div>
@@ -298,6 +301,7 @@
             モード: 'シミュレーション',
             マイク接続済み: false,
             一時停止中: false,
+            テスト音要求中: false,
             
             ドラッグモード: 'move',
             ドラッグ中: false,
@@ -488,24 +492,9 @@
         // 4. Web Audio API ＆ リングバッファ（ドライブレコーダー）
         // ==========================================
 
-        // オーディオ初期化の完了状態を管理するフラグを追加
-        let オーディオ初期化完了 = false;
-
         async function オーディオ初期化() {
-            if (オーディオ初期化完了) return; // 既に初期化済みならスキップ
-
-            if (!オーディオコンテキスト) {
+            if (!アナライザー && オーディオコンテキスト) {
                 // iOS対策のため、イベントリスナー内で既に生成されている前提
-                window.AudioContext = window.AudioContext || window.webkitAudioContext;
-                オーディオコンテキスト = new AudioContext();
-            }
-            
-            if (オーディオコンテキスト.state === 'suspended') {
-                 await オーディオコンテキスト.resume();
-            }
-
-            // アナライザーやプロセッサノードが未作成の場合のみ作成
-            if (!アナライザー) {
                 サンプリングレート = オーディオコンテキスト.sampleRate;
                 
                 アナライザー = オーディオコンテキスト.createAnalyser();
@@ -535,7 +524,6 @@
                 プロセッサノード.connect(ミュートノード);
                 ミュートノード.connect(オーディオコンテキスト.destination);
             }
-            オーディオ初期化完了 = true;
         }
 
         function アプリURLの初期設定() {
@@ -552,12 +540,13 @@
         UI.ボタン_マイク.addEventListener('click', async () => {
             try {
                 // 【超重要】ボタンが押された「同期タイミング」でAudioContextを作成＆resumeする。
+                // これにより、iOSのSafariやGitHub Pages環境でのマイク権限ブロックを回避します。
                 window.AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!オーディオコンテキスト) {
                     オーディオコンテキスト = new AudioContext();
                 }
                 if (オーディオコンテキスト.state === 'suspended') {
-                    await オーディオコンテキスト.resume(); // awaitを追加して確実に再開を待つ
+                    オーディオコンテキスト.resume();
                 }
 
                 // その後でマイクへのアクセス要求を行う
@@ -565,28 +554,23 @@
                     audio: { echoCancellation: true, noiseSuppression: true } 
                 });
 
-                // バッファ等の準備 (awaitで確実に完了を待つ)
+                // バッファ等の準備
                 await オーディオ初期化();
                 
-                // ノードが正しく作成されているか確認してから接続 (TypeError対策)
-                if (プロセッサノード && アナライザー) {
-                    const マイクソース = オーディオコンテキスト.createMediaStreamSource(マイクストリーム);
-                    マイクソース.connect(アナライザー); // データ解析用
-                    マイクソース.connect(プロセッサノード); // 履歴録音用
-                    
-                    状態.マイク接続済み = true;
-                    UI.ボタン_マイク.classList.replace('bg-red-600', 'bg-slate-700');
-                    UI.ボタン_マイク.classList.replace('hover:bg-red-500', 'hover:bg-slate-600');
-                    UI.ボタン_マイク.innerHTML = '🎤 マイク接続中';
-                    UI.ステータス_マイク.innerText = "接続済み";
-                    UI.ステータス_マイク.className = "text-green-400";
-                } else {
-                    throw new Error("オーディオノードの初期化に失敗しました。");
-                }
+                const マイクソース = オーディオコンテキスト.createMediaStreamSource(マイクストリーム);
+                マイクソース.connect(アナライザー); // データ解析用
+                マイクソース.connect(プロセッサノード); // 履歴録音用
+                
+                状態.マイク接続済み = true;
+                UI.ボタン_マイク.classList.replace('bg-red-600', 'bg-slate-700');
+                UI.ボタン_マイク.classList.replace('hover:bg-red-500', 'hover:bg-slate-600');
+                UI.ボタン_マイク.innerHTML = '🎤 マイク接続中';
+                UI.ステータス_マイク.innerText = "接続済み";
+                UI.ステータス_マイク.className = "text-green-400";
             } catch (エラー) {
                 console.warn("マイク取得例外を検知:", エラー);
                 UI.入力_アプリURL.value = window.location.href;
-                UI.モーダル_マイクエラー.classList.remove('hidden'); 
+                UI.モーダル_マイクエラー.classList.remove('hidden'); // 埋め込み環境等で拒否された場合の案内
             }
         });
 
@@ -608,19 +592,14 @@
 
         function テスト音開始() {
             if(状態.マイク接続済み) return; 
+            状態.テスト音要求中 = true;
             window.AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!オーディオコンテキスト) オーディオコンテキスト = new AudioContext();
-            
-            // 非同期処理を正しく繋ぐ
-            const 初期化プロセス = async () => {
-                if (オーディオコンテキスト.state === 'suspended') await オーディオコンテキスト.resume();
-                await オーディオ初期化();
+            if (オーディオコンテキスト.state === 'suspended') オーディオコンテキスト.resume();
 
-                if (テスト用オシレータ) return; // 既に鳴っていれば何もしない
-                
-                // プロセッサノードがまだなければ接続しない(TypeError対策)
-                if (!プロセッサノード || !アナライザー) return;
-
+            オーディオ初期化().then(() => {
+                if (!状態.テスト音要求中) return;
+                if (テスト用オシレータ) return;
                 テスト用オシレータ = オーディオコンテキスト.createOscillator();
                 テスト用オシレータ.type = 'sine';
                 テスト用オシレータ.frequency.value = 329.63; 
@@ -630,26 +609,18 @@
                 テスト用オシレータ.connect(アナライザー);
                 テスト用オシレータ.connect(プロセッサノード); // 履歴録音用にも繋ぐ
                 アナライザー.connect(オーディオコンテキスト.destination); 
-                
-                // startの呼び出しを確実に
-                テスト用オシレータ.start();
+                try { テスト用オシレータ.start(); } catch(e) {}
                 
                 状態.マイク接続済み = true;
                 UI.ステータス_マイク.innerText = "テスト発振中";
                 UI.ステータス_マイク.className = "text-emerald-400";
-            };
-            
-            初期化プロセス();
+            });
         }
 
         function テスト音停止() {
+            状態.テスト音要求中 = false;
             if (テスト用オシレータ) {
-                try {
-                    // startが完了する前にstopが呼ばれる InvalidStateError を回避
-                    テスト用オシレータ.stop();
-                } catch (e) {
-                    console.warn("テスト音の停止時にエラーをキャッチ（無視可能）:", e);
-                }
+                try { テスト用オシレータ.stop(); } catch(e) {}
                 テスト用オシレータ.disconnect();
                 テスト用オシレータ = null;
                 キャンバス.removeEventListener('mousemove', オシレータ音程変更);
@@ -762,9 +733,16 @@
 
             if (!状態.マイク接続済み || !波形履歴バッファ || 波形履歴バッファ.length === 0) {
                 コンテキスト.fillStyle = '#64748b';
-                コンテキスト.font = 'bold 18px sans-serif';
+                コンテキスト.font = 'bold 16px sans-serif';
                 コンテキスト.textAlign = 'center';
-                コンテキスト.fillText('マイクを接続するか、テスト音を鳴らしてください', キャンバス.width / 2, キャンバス.height / 2);
+                コンテキスト.fillText('マイクを接続するか、テスト音を鳴らしてください', キャンバス.width / 2, キャンバス.height / 2 - 20);
+                
+                コンテキスト.fillStyle = '#38bdf8';
+                コンテキスト.font = '12px sans-serif';
+                コンテキスト.fillText('ドラッグでX軸/Y軸スケールのリアルタイム変更が可能です！', キャンバス.width / 2, キャンバス.height / 2 + 10);
+                
+                コンテキスト.fillStyle = '#facc15'; // yellow-400
+                コンテキスト.fillText('⚠️ iPadでマイクが反応しない場合：「設定」アプリ ＞「Safari」＞「マイク」を「許可」にしてください', キャンバス.width / 2, キャンバス.height / 2 + 40);
                 return;
             }
 
